@@ -1,0 +1,13 @@
+[plugin]
+summary = '工作流引擎'
+version = '0.1.0'
+description = '移植自mldong的工作流引擎'
+author = 'Shj366'
+tags = ['other']
+database = ['mysql']
+
+[app]
+router = ['v1']
+
+[dependencies]
+packages = []
