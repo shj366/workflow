@@ -41,3 +41,7 @@ drop table if exists wf_task;
 drop table if exists wf_process_instance;
 drop table if exists wf_process_define;
 drop table if exists wf_process_design;
+
+drop table if exists wf_process_task_actor;
+drop table if exists wf_process_task;
+drop table if exists wf_process_cc_instance;

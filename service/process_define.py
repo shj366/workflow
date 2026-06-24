@@ -40,7 +40,8 @@ class ProcessDefineService:
 
         page_data = await paging_data(db, stmt)
         # 转换成驼峰格式
-        if items := page_data.get('items'):
+        items = page_data.get('items')
+        if items:
             page_data['items'] = [
                 ProcessDefineModel.model_validate(item).model_dump(by_alias=True)
                 for item in items

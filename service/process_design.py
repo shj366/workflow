@@ -43,7 +43,8 @@ class ProcessDesignService:
         )
 
         page_data = await paging_data(db, stmt)
-        if items := page_data.get('items'):
+        items = page_data.get('items')
+        if items:
             page_data['items'] = [
                 ProcessDesignModel.model_validate(item).model_dump(by_alias=True)
                 for item in items
@@ -364,7 +365,7 @@ class ProcessDesignService:
         from backend.app.admin.model.user import User
         
         # 1. 查询所有部门
-        dept_stmt = select(Dept).where(Dept.status == 1, Dept.del_flag == 0).order_by(Dept.sort)
+        dept_stmt = select(Dept).where(Dept.status == 1, Dept.deleted == 0).order_by(Dept.sort)
         dept_result = await db.execute(dept_stmt)
         depts = dept_result.scalars().all()
         

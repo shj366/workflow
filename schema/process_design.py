@@ -22,7 +22,7 @@ class ProcessDesignModel(SchemaBase):
     type: Optional[int] = Field(default=None, description="流程类型")
     icon: Optional[str] = Field(default=None, description="图标")
     is_deployed: Optional[int] = Field(default=0, description="是否已部署")
-    json_object: Optional[dict[str, Any]] = Field(default=None, description="流程定义JSON")
+    json_object: Optional[dict[str, Any]] = Field(default=None, description="流程设计JSON对象")
     remark: Optional[str] = Field(default=None, description="备注")
 
     @field_validator('json_object', mode='before')
