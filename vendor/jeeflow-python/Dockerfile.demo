@@ -1,0 +1,18 @@
+# jeeflow-python demo Docker 镜像
+FROM python:3.10-slim
+WORKDIR /app
+
+# 安装 demo 依赖（aiomysql 是 jeeflow/__init__.py 无条件导入 mysql 仓储所需）
+RUN pip install --no-cache-dir fastapi uvicorn aiomysql
+
+# 复制引擎源码
+COPY jeeflow/ /app/jeeflow/
+# 复制 demo
+COPY demo/ /app/demo/
+# 流程定义用本仓 flows/ 副本（已入库，demo/main.py 走 flows_resolver；用户单仓即可构建）
+COPY flows /app/flows
+COPY flows_resolver.py /app/flows_resolver.py
+
+EXPOSE 8100
+ENV PORT=8100
+CMD ["uvicorn", "demo.main:app", "--host", "0.0.0.0", "--port", "8100"]
