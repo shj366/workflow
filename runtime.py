@@ -6,9 +6,15 @@ import asyncio
 from typing import Any
 
 import aiomysql
-from jeeflow import EngineExtensions, EngineImpl, HandlerRegistry, JeeflowFacade, register_builtin_assignments
-from jeeflow.repository import JdbcRepository, MySqlAdapter, TsIDGenerator
-from jeeflow.repository.ext import JdbcProcessExtRepository
+from .vendor.jeeflow_python.jeeflow import (
+    EngineExtensions,
+    EngineImpl,
+    HandlerRegistry,
+    JeeflowFacade,
+    register_builtin_assignments,
+)
+from .vendor.jeeflow_python.jeeflow.repository import JdbcRepository, MySqlAdapter, TsIDGenerator
+from .vendor.jeeflow_python.jeeflow.repository.ext import JdbcProcessExtRepository
 
 from backend.core.conf import settings
 

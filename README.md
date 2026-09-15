@@ -5,12 +5,11 @@ Flzk workflow UI and API are now backed by the upstream `jeeflow-python` engine 
 ## Runtime contract
 
 - HTTP entrypoint: `POST /api/v1/wf/{action}`
-- Facade response: `{ code: 0, msg, data }`
+- Engine source: `vendor/jeeflow_python/jeeflow` (synced from the upstream repository)
 - Current operator: injected from the authenticated Flzk JWT user
 - Persistence: `wf_*` tables initialized by `sql/mysql/init.sql` or `init_snowflake.sql`
-- Engine dependency: locked to the upstream `jeeflow-python` Git revision in `flzk_backend/uv.lock`
 
-The previous FBA workflow engine implementation was removed from the active plugin surface. The pre-switch implementation is preserved in the repository backup directory created for this replacement and in the `backup/workflow-before-jeeflow` refs.
+The engine source is vendored under `vendor/jeeflow_python`; update it with the `jeeflow-python` git remote and subtree sync instead of installing a second top-level package.
 
 ## Frontend
 

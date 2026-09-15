@@ -5,14 +5,13 @@ from __future__ import annotations
 import operator
 import re
 from typing import Any
-
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, or_, select
 
 from backend.app.admin.model import Dept, Role, User, user_role
 from backend.database.db import async_db_session
 
-from jeeflow.model import UserInfo
-from jeeflow.spi import ExpressionEvaluator, OrgUserProvider, UserProvider
+from .vendor.jeeflow_python.jeeflow.model import UserInfo
+from .vendor.jeeflow_python.jeeflow.spi import ExpressionEvaluator, OrgUserProvider, UserProvider
 
 
 class FlzkUserProvider(UserProvider):
