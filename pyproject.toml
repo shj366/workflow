@@ -1,0 +1,23 @@
+[project]
+name = "jeeflow"
+version = "1.8.28"
+description = "Lightweight async workflow engine - Python implementation"
+license = { text = "Apache-2.0" }
+authors = [{ name = "mldong" }]
+requires-python = ">=3.10"
+
+# 核心零依赖。JDBC 仓储按数据库选装（pip install jeeflow[mysql] / jeeflow[postgres]）；
+# 只用内存仓储（MemoryRepository）时无需任何额外安装
+dependencies = []
+
+[project.optional-dependencies]
+mysql = ["aiomysql>=0.2.0"]
+postgres = ["asyncpg>=0.29.0"]
+dev = ["pytest", "pytest-asyncio", "aiomysql"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["jeeflow*"]

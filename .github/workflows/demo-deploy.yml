@@ -1,0 +1,43 @@
+name: Demo Deploy
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Python demo
+    runs-on: ubuntu-latest
+    steps:
+      # 流程定义用本仓 flows/ 副本（已入库），无需 checkout jeeflow-java
+      - uses: actions/checkout@v4
+      - name: Build Docker image
+        run: |
+          # Dockerfile.demo 构建上下文 = 本仓根（jeeflow/ + demo/ + flows/ + flows_resolver.py）
+          docker build -f Dockerfile.demo -t jeeflow-python-demo:latest .
+      - name: Export image
+        run: |
+          docker save jeeflow-python-demo:latest -o jeeflow-python-demo.tar
+          chmod 644 jeeflow-python-demo.tar
+      - name: Upload to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: jeeflow-python-demo.tar
+          target: /java_projects/jeeflow/demo/
+      - name: Load image and restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /java_projects/jeeflow/demo
+            docker load -i jeeflow-python-demo.tar
+            # Stop and remove old container if exists
+            docker stop jeeflow-python-demo 2>/dev/null && docker rm jeeflow-python-demo 2>/dev/null || true
+            docker run -d --name jeeflow-python-demo --restart always -p 16082:8100 jeeflow-python-demo:latest
+            rm -f jeeflow-python-demo.tar
+            echo "✅ Python demo deployed (port 16082->8100)"
