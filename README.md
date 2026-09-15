@@ -1,45 +1,19 @@
 # Workflow Plugin
 
-为fastapi-best-architecture框架提供审批流相关能力的插件， 支持完整的流程定义管理、任务流转控制与实例状态维护功能。
+Flzk workflow UI and API are now backed by the upstream `jeeflow-python` engine and `jeeflow-ui` facade contract.
 
-## 📋 开源声明
+## Runtime contract
 
-本插件基于fastapi-best-architecture框架开发，审批流模块参考了开源项目的设计思路：
+- HTTP entrypoint: `POST /api/v1/wf/{action}`
+- Facade response: `{ code: 0, msg, data }`
+- Current operator: injected from the authenticated Flzk JWT user
+- Persistence: `wf_*` tables initialized by `sql/mysql/init.sql` or `init_snowflake.sql`
+- Engine dependency: locked to the upstream `jeeflow-python` Git revision in `flzk_backend/uv.lock`
 
-- **开发框架**：fastapi-best-architecture插件架构
-- **参考来源**：mldong-python(Flask)开源项目的审批流模块设计
+The previous FBA workflow engine implementation was removed from the active plugin surface. The pre-switch implementation is preserved in the repository backup directory created for this replacement and in the `backup/workflow-before-jeeflow` refs.
 
-## ✨ 功能特性
+## Frontend
 
-### 核心功能
-- **🔧 流程定义管理**：管理并持久化各版本的流程定义，支持版本隔离与热部署
-- **🎯 任务流转控制**：实现业务逻辑与工作流状态的深度集成，支持审批、驳回、抄送、跳转等多种操作
-- **📊 实例状态维护**：记录完整的流程审批链条与变量信息，提供实时且可回溯的流程轨迹
-- **🔌 业务集成 API**：对外暴露标准的 REST API，便于各类业务系统发起流程与办理任务
+The frontend plugin consumes the upstream `@mldong/jeeflow-ui` source synced under `vendor/jeeflow-ui`. Its process designer is patched to use `mldong-flow-designer-plus` 3.1.x so the same LogicFlow/Snaker JSON is used for design, preview, and runtime.
 
-### 扩展能力
-- **🏗️ 高可用与可扩展**：基于轻量级引擎构建，支持自定义节点处理器、监听器与参与者转换器
-- **🎨 可视化流程设计**：前端集成SnakerFlow设计器，支持拖拽式流程建模
-- **📈 监控与统计**：提供流程执行效率分析和任务处理统计功能
-
-## 🏗️ 架构设计
-
-```
-plugin/wf/
-├── api/           # API路由层
-├── core/          # 核心引擎
-├── models/        # 数据模型
-├── schemas/       # Pydantic模式
-├── services/      # 业务逻辑层
-└── utils/         # 工具函数
-```
-
-## 🤝 贡献指南
-
-欢迎提交Issue和Pull Request来共同改进此插件。
-
-
-## 插件预览
-<img width="1689" height="948" alt="f544b3c5-5ab9-4b43-abb9-bb7258d804b9" src="https://github.com/user-attachments/assets/42635a69-ceb7-494b-a668-8ced106faef3" />
-<img width="1912" height="948" alt="a925f88f-81b9-4a60-83ec-7576d21f0ec6" src="https://github.com/user-attachments/assets/032c1fb4-3f17-4208-8fa6-20612b9850c0" />
-<img width="1688" height="948" alt="24b75875-20db-4a9f-a24a-6aa435a554bc" src="https://github.com/user-attachments/assets/035a6bc8-3530-41ec-8a8f-b8c3622c3298" />
+The frontend host adapters map user, role, token, operator, and permission data to Flzk APIs. Dictionary and upload adapters remain intentionally absent until a concrete Flzk dictionary/file contract is selected.

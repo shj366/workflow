@@ -1,8 +1,8 @@
 [plugin]
-summary = 'workflow审批流'
-version = '0.1.0'
-description = '基于 SnakerFlow 扩展的后端审批流引擎，提供流程定义管理、任务流转控制与实例状态维护功能'
-author = 'shj366'
+summary = 'jeeflow 工作流审批流'
+version = '1.8.28'
+description = '基于 jeeflow-python 与 jeeflow-ui 的统一门面工作流插件'
+author = 'mldong / Flzk'
 tags = ['task', 'notification', 'other']
 database = ['mysql', ]
 

@@ -1,47 +1,19 @@
-delete from sys_menu
-where name in (
-    'WorkflowCenter',
-    'WorkflowApply',
-    'WorkflowProcessDesign',
-    'AddWorkflowProcessDesign',
-    'EditWorkflowProcessDesign',
-    'DeleteWorkflowProcessDesign',
-    'DeployWorkflowProcessDesign',
-    'WorkflowProcessDefine',
-    'AddWorkflowProcessDefine',
-    'EditWorkflowProcessDefine',
-    'DeleteWorkflowProcessDefine',
-    'StartWorkflowProcess',
-    'AddWorkflowApply',
-    'WorkflowTaskTodo',
-    'ViewWorkflowTodoTask',
-    'CompleteWorkflowTask',
-    'RejectWorkflowTask',
-    'RollbackWorkflowTask',
-    'JumpWorkflowTask',
-    'AddCandidateWorkflowTask',
-    'SurrogateWorkflowTask',
-    'CcWorkflowTask',
-    'WorkflowTaskDone',
-    'ViewWorkflowDoneTask',
-    'WorkflowInstanceMy',
-    'ViewWorkflowInstanceMy',
-    'WithdrawWorkflowInstanceMy',
-    'WorkflowInstanceCc',
-    'ViewWorkflowInstanceCc',
-    'ReadWorkflowInstanceCc'
+DELETE FROM sys_menu
+WHERE name IN (
+  'Workflow', 'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
+  'WorkflowProcessDefine', 'WorkflowTaskTodo', 'WorkflowTaskDone',
+  'WorkflowInstanceMy', 'WorkflowInstanceCc', 'AddWorkflowProcessDesign',
+  'EditWorkflowProcessDesign', 'DeleteWorkflowProcessDesign',
+  'DeployWorkflowProcessDesign', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
+  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'WithdrawWorkflowInstanceMy',
+  'ViewWorkflowInstanceCc'
 );
 
-delete from sys_menu where name = 'Workflow';
-
--- 删除工作流相关表
-drop table if exists wf_task_cc;
-drop table if exists wf_task_candidate;
-drop table if exists wf_task;
-drop table if exists wf_process_instance;
-drop table if exists wf_process_define;
-drop table if exists wf_process_design;
-
-drop table if exists wf_process_task_actor;
-drop table if exists wf_process_task;
-drop table if exists wf_process_cc_instance;
+DROP TABLE IF EXISTS wf_process_design_his;
+DROP TABLE IF EXISTS wf_process_surrogate;
+DROP TABLE IF EXISTS wf_process_cc_instance;
+DROP TABLE IF EXISTS wf_process_task_actor;
+DROP TABLE IF EXISTS wf_process_task;
+DROP TABLE IF EXISTS wf_process_instance;
+DROP TABLE IF EXISTS wf_process_define;
+DROP TABLE IF EXISTS wf_process_design;
