@@ -143,15 +143,20 @@ CREATE TABLE wf_process_surrogate (
 -- Re-running initialization must remove old workflow menu component paths first.
 DELETE FROM sys_menu
 WHERE name IN (
-  'Workflow', 'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
+  'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
   'WorkflowProcessDefine', 'WorkflowTaskTodo', 'WorkflowTaskDone',
   'WorkflowInstanceMy', 'WorkflowInstanceCc', 'AddWorkflowProcessDesign',
   'EditWorkflowProcessDesign', 'DeleteWorkflowProcessDesign',
-  'DeployWorkflowProcessDesign', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
-  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'WithdrawWorkflowInstanceMy',
-  'ViewWorkflowInstanceCc'
+  'DeployWorkflowProcessDesign', 'AddWorkflowProcessDefine',
+  'EditWorkflowProcessDefine', 'DeleteWorkflowProcessDefine',
+  'StartWorkflowProcess', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
+  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'RejectWorkflowTask',
+  'RollbackWorkflowTask', 'JumpWorkflowTask', 'AddCandidateWorkflowTask',
+  'SurrogateWorkflowTask', 'CcWorkflowTask', 'ViewWorkflowInstanceMy',
+  'WithdrawWorkflowInstanceMy', 'ViewWorkflowInstanceCc',
+  'ReadWorkflowInstanceCc'
 );
-
+DELETE FROM sys_menu WHERE name = 'Workflow';
 -- 工作流模块菜单
 insert into sys_menu (title, name, path, sort, icon, type, component, perms, status, display, cache, link, remark, parent_id, created_time, updated_time)
 values ('工作流', 'Workflow', '/workflow', 0, 'ant-design:apartment-outlined', 0, null, null, 1, 1, 1, '', null, null, now(), null);
