@@ -140,7 +140,18 @@ CREATE TABLE wf_process_surrogate (
   KEY idx_wf_process_surrogate_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Existing Flzk menu table entries are intentionally kept below the new workflow schema.
+-- Re-running initialization must remove old workflow menu component paths first.
+DELETE FROM sys_menu
+WHERE name IN (
+  'Workflow', 'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
+  'WorkflowProcessDefine', 'WorkflowTaskTodo', 'WorkflowTaskDone',
+  'WorkflowInstanceMy', 'WorkflowInstanceCc', 'AddWorkflowProcessDesign',
+  'EditWorkflowProcessDesign', 'DeleteWorkflowProcessDesign',
+  'DeployWorkflowProcessDesign', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
+  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'WithdrawWorkflowInstanceMy',
+  'ViewWorkflowInstanceCc'
+);
+
 -- 工作流模块菜单
 insert into sys_menu (title, name, path, sort, icon, type, component, perms, status, display, cache, link, remark, parent_id, created_time, updated_time)
 values ('工作流', 'Workflow', '/workflow', 0, 'ant-design:apartment-outlined', 0, null, null, 1, 1, 1, '', null, null, now(), null);
