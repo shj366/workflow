@@ -58,6 +58,12 @@ class JeeflowFacade:
         """注入组织用户提供者（candidatePage candidateGroups 角色取人）"""
         self._org_prov = org_prov
         return self
+    async def _with_transaction(self, operation):
+        """事务包裹流程状态变更，避免实例、任务分步落库造成状态撕裂。"""
+        transaction = getattr(self._repo, 'with_tx', None)
+        if callable(transaction):
+            return await transaction(operation)
+        return await operation()
 
     async def flow(self, action: str, args: Optional[dict] = None) -> dict:
         args = args or {}
@@ -146,13 +152,17 @@ class JeeflowFacade:
         return await self._startAndExecute(args)
 
     async def _startAndExecute(self, args: dict) -> dict:
+        async def operation():
+            return await self._startAndExecute_inner(args)
+        return await self._with_transaction(operation)
+
+    async def _startAndExecute_inner(self, args: dict) -> dict:
         define_id = self._to_int(args.get("processDefineId"))
         if not define_id:
             raise ValueError("processDefineId 缺失或非法")
         operator = str(args.get("operator", "user1"))
         flow_args = {k: v for k, v in args.items() if k not in ("processDefineId", "operator")}
         inst = await self._engine.start_process_instance_by_id(define_id, operator, flow_args)
-        # issues/56 E28：发起时抄送（f_ccActors）创建 cc 实例（对齐 Java enableCcActors 语义）
         cc = flow_args.get("f_ccActors")
         if cc is not None:
             if isinstance(cc, str):
@@ -163,17 +173,19 @@ class JeeflowFacade:
                 cc_list = []
             if cc_list:
                 await self._repo.create_cc_instance(inst.id, operator, *cc_list)
-                # issues/102：CC 实例落库后逐抄送人 fire CC_CREATE（ccActorId 直传事件体，
-                # 在 start 事务内；监听器据此落抄送知会 NOTICE）
                 for actor in cc_list:
                     await self._engine.fire_event(
                         ProcessEvent(type=EventType.CC_CREATE, instanceId=inst.id, ccActorId=actor))
-        # startAndExecute：自动完成申请节点（assignee="applicant" → 发起人）
-        doing = await self._repo.find_doing_tasks(inst.id)
+        graph = await self._instance_json_object(inst)
+        first_task_id = self._first_task_node_id(graph)
+        doing = [task for task in await self._repo.find_doing_tasks(inst.id) if task.taskName == first_task_id]
+        if not doing:
+            raise ValueError("流程启动后未生成申请任务")
+        if len(doing) > 1:
+            raise ValueError("申请任务不允许配置多个并行参与人")
         for task in doing:
             await self._repo.add_task_actor(task.id, [operator])
             flow_args["submitType"] = SUBMIT_APPLY
-            # 对齐 boot3：f_nextNodeOperator（发起时预指派人）→ tf_nextNodeOperator（引擎执行参数）
             start_next_op = flow_args.get(KEY_PROCESS_START_NEXT_NODE_OPERATOR)
             if start_next_op:
                 flow_args[KEY_NEXT_NODE_OPERATOR] = start_next_op
@@ -201,10 +213,31 @@ class JeeflowFacade:
         await ext.update_design(design)
         return define_id
 
+    @staticmethod
+    def _validate_flow_for_deploy(flow: dict) -> None:
+        nodes = flow.get('nodes')
+        edges = flow.get('edges')
+        if not isinstance(nodes, list) or not nodes:
+            raise ValueError('流程定义缺少有效 nodes，无法发布')
+        if not isinstance(edges, list) or not edges:
+            raise ValueError('流程定义缺少有效 edges，无法发布')
+        for node in nodes:
+            if not isinstance(node, dict) or node.get('type') not in ('snaker:task', 'snaker:custom'):
+                continue
+            properties = node.get('properties') or {}
+            if not isinstance(properties, dict):
+                raise ValueError(f"任务节点[{node.get('id', '')}]属性格式非法")
+            assignee = str(properties.get('assignee') or '').strip()
+            assignment_handler = str(properties.get('assignmentHandler') or '').strip()
+            if not assignee and not assignment_handler:
+                name = (node.get('text') or {}).get('value') or node.get('id') or '未命名'
+                raise ValueError(f"任务节点[{name}]未配置参与人或参与人处理类")
+
     async def _deploy(self, args: dict) -> dict:
         """deploy 版本管理（对齐 boot3）：按 name 查最新定义，存在 version+1 插新记录，否则从 0 起"""
         content = self._content(args)
         flow = json.loads(content)
+        self._validate_flow_for_deploy(flow)
         name = flow.get("name", "")
         if not name:
             raise ValueError("流程定义缺少 name")
@@ -226,6 +259,7 @@ class JeeflowFacade:
             raise ValueError("processDefineId 缺失或非法")
         content = self._content(args)
         flow = json.loads(content)
+        self._validate_flow_for_deploy(flow)
         def_ = ProcessDefine(id=define_id, name=flow.get("name", ""),
                              displayName=flow.get("displayName", ""),
                              type=flow.get("type", "approval"),
@@ -293,6 +327,11 @@ class JeeflowFacade:
         return self._page_data([self._task_row_to_dict(r) for r in rows], total, page_num, page_size)
 
     async def _processTask_execute(self, args: dict) -> dict:
+        async def operation():
+            return await self._processTask_execute_inner(args)
+        return await self._with_transaction(operation)
+
+    async def _processTask_execute_inner(self, args: dict) -> dict:
         task_id = self._to_int(args.get("processTaskId"))
         if not task_id:
             raise ValueError("processTaskId 缺失或非法")
@@ -300,7 +339,6 @@ class JeeflowFacade:
         submit_type = self._to_int(args.get("submitType")) or SUBMIT_AGREE
         flow_args = {k: v for k, v in args.items() if k not in ("processTaskId", "operator")}
         flow_args["submitType"] = submit_type
-        # boot3 execute 分发（spec §11.2）
         if submit_type == SUBMIT_REJECT:
             await self._engine.execute_and_jump_to_end(task_id, operator, flow_args)
         elif submit_type == SUBMIT_ROLLBACK:
@@ -313,7 +351,7 @@ class JeeflowFacade:
         elif submit_type == SUBMIT_COUNTERSIGN_DISAGREE:
             flow_args["countersignDisagreeFlag"] = 1
             await self._engine.execute_process_task(task_id, operator, flow_args)
-        else:  # 0 APPLY / 1 AGREE / 5 重新提交
+        else:
             await self._engine.execute_process_task(task_id, operator, flow_args)
         return None
 
@@ -704,13 +742,13 @@ class JeeflowFacade:
         node_progress = {}
         def_ = await self._repo.find_define_by_id(inst.defineId)
         if def_:
-            try:
-                flow = json.loads(def_.content)
-                node_progress = await self._build_node_progress(flow, his)
+            flow = json.loads(def_.content)
+            node_progress = await self._build_node_progress(flow, his)
+            # 仅在存在活跃任务，或实例确实已完成时补全路径；
+            # 进行中但无待办属于数据不一致，不能把未来节点伪装成已完成。
+            if active or inst.state == InstanceState.DONE:
                 await self._collect_path(flow, "start", "", active, history, edges, set(),
                                          inst.variables, his)
-            except Exception:
-                pass
         return {"activeNodeNames": active, "historyNodeNames": history,
                 "historyEdgeNames": edges, "nodeProgress": node_progress}
 

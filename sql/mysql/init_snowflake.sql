@@ -1,14 +1,6 @@
 -- jeeflow workflow schema for the Flzk MySQL database.
 -- The existing wf_* tables are intentionally recreated by deployment; no data migration is provided.
 
-DROP TABLE IF EXISTS wf_process_design_his;
-DROP TABLE IF EXISTS wf_process_surrogate;
-DROP TABLE IF EXISTS wf_process_cc_instance;
-DROP TABLE IF EXISTS wf_process_task_actor;
-DROP TABLE IF EXISTS wf_process_task;
-DROP TABLE IF EXISTS wf_process_instance;
-DROP TABLE IF EXISTS wf_process_define;
-DROP TABLE IF EXISTS wf_process_design;
 
 CREATE TABLE wf_process_define (
   id BIGINT NOT NULL PRIMARY KEY,
@@ -140,23 +132,8 @@ CREATE TABLE wf_process_surrogate (
   KEY idx_wf_process_surrogate_enabled (enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Re-running initialization must remove old workflow menu component paths first.
-DELETE FROM sys_menu
-WHERE name IN (
-  'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
-  'WorkflowProcessDefine', 'WorkflowTaskTodo', 'WorkflowTaskDone',
-  'WorkflowInstanceMy', 'WorkflowInstanceCc', 'AddWorkflowProcessDesign',
-  'EditWorkflowProcessDesign', 'DeleteWorkflowProcessDesign',
-  'DeployWorkflowProcessDesign', 'AddWorkflowProcessDefine',
-  'EditWorkflowProcessDefine', 'DeleteWorkflowProcessDefine',
-  'StartWorkflowProcess', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
-  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'RejectWorkflowTask',
-  'RollbackWorkflowTask', 'JumpWorkflowTask', 'AddCandidateWorkflowTask',
-  'SurrogateWorkflowTask', 'CcWorkflowTask', 'ViewWorkflowInstanceMy',
-  'WithdrawWorkflowInstanceMy', 'ViewWorkflowInstanceCc',
-  'ReadWorkflowInstanceCc'
-);
-DELETE FROM sys_menu WHERE name = 'Workflow';
+-- 初始化脚本只负责创建结构和插入菜单。
+-- 已安装环境请先执行 destroy.sql，再执行本脚本；init.sql 禁止 DELETE。
 -- 工作流模块菜单
 insert into sys_menu (title, name, path, sort, icon, type, component, perms, status, display, cache, link, remark, parent_id, created_time, updated_time)
 values ('工作流', 'Workflow', '/workflow', 0, 'ant-design:apartment-outlined', 0, null, null, 1, 1, 1, '', null, null, now(), null);
@@ -172,7 +149,8 @@ values
 ('待办任务', 'WorkflowTaskTodo', '/workflow/processTask/todo', 0, 'ant-design:profile-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null),
 ('已办任务', 'WorkflowTaskDone', '/workflow/processTask/done', 0, 'ant-design:check-circle-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null),
 ('我的流程', 'WorkflowInstanceMy', '/workflow/processInstance/my', 0, 'ant-design:user-switch-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null),
-('抄送给我', 'WorkflowInstanceCc', '/workflow/processInstance/cc', 0, 'ant-design:mail-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null);
+('抄送给我', 'WorkflowInstanceCc', '/workflow/processInstance/cc', 0, 'ant-design:mail-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null),
+('我的委托', 'WorkflowSurrogate', '/workflow/processSurrogate', 0, 'ant-design:swap-outlined', 1, '/plugins/workflow/views/jeeflowCenter/index', null, 1, 1, 1, '', null, @workflow_menu_id, now(), null);
 
 set @workflow_center_id = (select id from sys_menu where name = 'WorkflowCenter' and parent_id = @workflow_menu_id);
 set @workflow_apply_id = (select id from sys_menu where name = 'WorkflowApply' and parent_id = @workflow_menu_id);
@@ -185,9 +163,22 @@ values
 ('修改流程设计', 'EditWorkflowProcessDesign', null, 0, null, 2, null, 'workflow:process-design:edit', 1, 0, 1, '', null, @process_design_id, now(), null),
 ('删除流程设计', 'DeleteWorkflowProcessDesign', null, 0, null, 2, null, 'workflow:process-design:del', 1, 0, 1, '', null, @process_design_id, now(), null),
 ('部署流程设计', 'DeployWorkflowProcessDesign', null, 0, null, 2, null, 'workflow:process-design:deploy', 1, 0, 1, '', null, @process_design_id, now(), null),
+('新增流程定义', 'AddWorkflowProcessDefine', null, 0, null, 2, null, 'workflow:process-define:add', 1, 0, 1, '', null, @process_define_id, now(), null),
+('修改流程定义', 'EditWorkflowProcessDefine', null, 0, null, 2, null, 'workflow:process-define:edit', 1, 0, 1, '', null, @process_define_id, now(), null),
+('删除流程定义', 'DeleteWorkflowProcessDefine', null, 0, null, 2, null, 'workflow:process-define:del', 1, 0, 1, '', null, @process_define_id, now(), null),
+('启动流程', 'StartWorkflowProcess', null, 0, null, 2, null, 'workflow:process:start', 1, 0, 1, '', null, @process_define_id, now(), null),
 ('新增申请', 'AddWorkflowApply', null, 0, null, 2, null, 'workflow:apply:add', 1, 0, 1, '', null, @workflow_apply_id, now(), null),
 ('查看待办任务', 'ViewWorkflowTodoTask', null, 0, null, 2, null, 'workflow:task:todo:view', 1, 0, 1, '', null, @workflow_center_id, now(), null),
 ('查看已办任务', 'ViewWorkflowDoneTask', null, 0, null, 2, null, 'workflow:task:done:view', 1, 0, 1, '', null, @workflow_center_id, now(), null),
 ('完成任务', 'CompleteWorkflowTask', null, 0, null, 2, null, 'workflow:task:complete', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('驳回任务', 'RejectWorkflowTask', null, 0, null, 2, null, 'workflow:task:reject', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('退回任务', 'RollbackWorkflowTask', null, 0, null, 2, null, 'workflow:task:rollback', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('跳转节点', 'JumpWorkflowTask', null, 0, null, 2, null, 'workflow:task:jump', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('加签任务', 'AddCandidateWorkflowTask', null, 0, null, 2, null, 'workflow:task:add-candidate', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('委托任务', 'SurrogateWorkflowTask', null, 0, null, 2, null, 'workflow:task:surrogate', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('抄送任务', 'CcWorkflowTask', null, 0, null, 2, null, 'workflow:task:cc', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('查看我的流程', 'ViewWorkflowInstanceMy', null, 0, null, 2, null, 'workflow:instance:my:view', 1, 0, 1, '', null, @workflow_center_id, now(), null),
 ('撤回我的流程', 'WithdrawWorkflowInstanceMy', null, 0, null, 2, null, 'workflow:instance:my:withdraw', 1, 0, 1, '', null, @workflow_center_id, now(), null),
-('查看抄送', 'ViewWorkflowInstanceCc', null, 0, null, 2, null, 'workflow:instance:cc:view', 1, 0, 1, '', null, @workflow_center_id, now(), null);
+('查看抄送', 'ViewWorkflowInstanceCc', null, 0, null, 2, null, 'workflow:instance:cc:view', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('标记抄送已读', 'ReadWorkflowInstanceCc', null, 0, null, 2, null, 'workflow:instance:cc:read', 1, 0, 1, '', null, @workflow_center_id, now(), null),
+('查看我的委托', 'ViewWorkflowSurrogate', null, 0, null, 2, null, 'workflow:task:surrogate', 1, 0, 1, '', null, @workflow_center_id, now(), null);

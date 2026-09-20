@@ -1,13 +1,19 @@
 DELETE FROM sys_menu
 WHERE name IN (
-  'Workflow', 'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
+  'WorkflowCenter', 'WorkflowApply', 'WorkflowProcessDesign',
   'WorkflowProcessDefine', 'WorkflowTaskTodo', 'WorkflowTaskDone',
-  'WorkflowInstanceMy', 'WorkflowInstanceCc', 'AddWorkflowProcessDesign',
+  'WorkflowInstanceMy', 'WorkflowInstanceCc', 'WorkflowSurrogate', 'AddWorkflowProcessDesign',
   'EditWorkflowProcessDesign', 'DeleteWorkflowProcessDesign',
-  'DeployWorkflowProcessDesign', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
-  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'WithdrawWorkflowInstanceMy',
-  'ViewWorkflowInstanceCc'
+  'DeployWorkflowProcessDesign', 'AddWorkflowProcessDefine',
+  'EditWorkflowProcessDefine', 'DeleteWorkflowProcessDefine',
+  'StartWorkflowProcess', 'AddWorkflowApply', 'ViewWorkflowTodoTask',
+  'ViewWorkflowDoneTask', 'CompleteWorkflowTask', 'RejectWorkflowTask',
+  'RollbackWorkflowTask', 'JumpWorkflowTask', 'AddCandidateWorkflowTask',
+  'SurrogateWorkflowTask', 'CcWorkflowTask', 'ViewWorkflowInstanceMy',
+  'WithdrawWorkflowInstanceMy', 'ViewWorkflowInstanceCc',
+  'ReadWorkflowInstanceCc'
 );
+DELETE FROM sys_menu WHERE name = 'Workflow';
 
 DROP TABLE IF EXISTS wf_process_design_his;
 DROP TABLE IF EXISTS wf_process_surrogate;

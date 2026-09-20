@@ -376,8 +376,9 @@ class EngineImpl(Engine):
 
     async def _create_task(self, node: FlowNode, inst: ProcessInstance, operator: str, vars_: dict):
         actors = await self._resolve_actors(node, inst, operator, vars_)
-        if not actors: return
-        # performType 容错解析（对齐 Java codeOf，issue 42）：int 优先；
+        if not actors:
+            name = node.text.get("value", "") or node.id
+            raise ValueError(f"任务节点[{name}]未配置可解析的参与人")
         # 字符串 'ALL'/'COUNTERSIGN'（设计器面板格式，大小写不敏感）映射为会签；未知回落 0
         _pt = node.properties.get("performType", 0)
         try:
