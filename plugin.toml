@@ -1,10 +1,13 @@
 [plugin]
-summary = 'jeeflow 工作流审批流'
-version = '1.8.28'
-description = '基于 jeeflow-python 与 jeeflow-ui 的统一门面工作流插件'
-author = 'mldong / Flzk'
-tags = ['task', 'notification', 'other']
-database = ['mysql', ]
+summary = '工作流引擎'
+version = '0.1.0'
+description = '移植自mldong的工作流引擎'
+author = 'Shj366'
+tags = ['other']
+database = ['mysql']
 
 [app]
 router = ['v1']
+
+[dependencies]
+packages = []
