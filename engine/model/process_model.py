@@ -5,7 +5,7 @@ from backend.plugin.wf.engine.model.end_model import EndModel
 
 
 class ProcessModel(BaseModel):
-    type = None  # 流程定义分类
+    type: str | None = None  # 流程定义分类
     instanceUrl = None  # 启动实例要填写的表单key
     expireTime = None  # 期待完成时间变量key
     instanceNoClass = None  # 实例编号生成器实现类
@@ -17,7 +17,7 @@ class ProcessModel(BaseModel):
     postInterceptors = None  # 流程定义后置拦截器
 
     def __init__(self):
-        self.type = None
+        self.type: str | None = None
         self.instanceUrl = None  # 启动实例要填写的表单key
         self.expireTime = None  # 期待完成时间变量key
         self.instanceNoClass = None  # 实例编号生成器实现类

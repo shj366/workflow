@@ -158,12 +158,10 @@ class ProcessDesignService:
                 update_data["name"] = json_object["name"]
             if json_object.get("displayName"):
                 update_data["display_name"] = json_object["displayName"]
-            # type 必须是有效整数，空字符串不更新
-            if json_object.get("type") not in (None, "", ""):
-                try:
-                    update_data["type"] = int(json_object["type"])
-                except (ValueError, TypeError):
-                    pass  # 无效值不更新
+            # 流程类型统一按字符串保存，兼容旧流程 JSON 中的数字类型。
+            raw_type = json_object.get("type")
+            if raw_type not in (None, ""):
+                update_data["type"] = str(raw_type).strip()
         
         await db.execute(
             update(ProcessDesign)
@@ -319,18 +317,17 @@ class ProcessDesignService:
         designs = result.scalars().all()
         
         print(f"[DEBUG] Found {len(designs)} deployed designs")
-        
+
         # 按类型分组
         type_map = {}
         for design in designs:
-            type_key = design.type or 0
+            type_key = design.type or ""
             if type_key not in type_map:
                 type_map[type_key] = {
                     "type": type_key,
                     "title": f"类型{type_key}" if type_key else "默认分类",
-                    "items": []
+                    "items": [],
                 }
-            
             # 查询对应的最新启用的流程定义
             define_stmt = (
                 select(ProcessDefine)

@@ -16,7 +16,7 @@ class ProcessDesign(Base):
     id: Mapped[id_key] = mapped_column(init=False)
     name: Mapped[str] = mapped_column(String(64), comment="唯一编码", index=True)
     display_name: Mapped[str | None] = mapped_column(String(100), default=None, comment="显示名称")
-    type: Mapped[int | None] = mapped_column(Integer, default=None, comment="流程类型")
+    type: Mapped[str | None] = mapped_column(String(100), default=None, comment="流程类型")
     icon: Mapped[str | None] = mapped_column(String(100), default=None, comment="图标")
     is_deployed: Mapped[int] = mapped_column(Integer, default=0, comment="是否已部署(1是；0否)")
     json_object: Mapped[str | None] = mapped_column(Text, default=None, comment="流程定义JSON")

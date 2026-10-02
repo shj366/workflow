@@ -15,7 +15,7 @@ class ProcessDefine(Base, UserMixin):
     
     name: Mapped[str] = mapped_column(String(64), nullable=False, comment="唯一编码")
     display_name: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="显示名称")
-    type: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="流程类型")
+    type: Mapped[str | None] = mapped_column(String(100), nullable=True, comment="流程类型")
     state: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="流程状态(1可用；0不可用)")
     content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True, comment="流程模型定义")
     version: Mapped[int | None] = mapped_column(Integer, nullable=True, comment="流程版本")

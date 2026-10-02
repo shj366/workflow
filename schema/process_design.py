@@ -19,7 +19,7 @@ class ProcessDesignModel(SchemaBase):
     id: Optional[int] = Field(default=None, description="主键")
     name: Optional[str] = Field(default=None, description="唯一编码")
     display_name: Optional[str] = Field(default=None, description="显示名称")
-    type: Optional[int] = Field(default=None, description="流程类型")
+    type: Optional[str] = Field(default=None, description="流程类型")
     icon: Optional[str] = Field(default=None, description="图标")
     is_deployed: Optional[int] = Field(default=0, description="是否已部署")
     json_object: Optional[dict[str, Any]] = Field(default=None, description="流程定义JSON")
@@ -53,7 +53,7 @@ class ProcessDesignCreateModel(SchemaBase):
 
     name: str = Field(description="唯一编码")
     display_name: Optional[str] = Field(default=None, description="显示名称")
-    type: Optional[int] = Field(default=None, description="流程类型")
+    type: Optional[str] = Field(default=None, description="流程类型")
     icon: Optional[str] = Field(default=None, description="图标")
     remark: Optional[str] = Field(default=None, description="备注")
 
@@ -69,7 +69,7 @@ class ProcessDesignUpdateModel(SchemaBase):
     id: int = Field(description="主键")
     name: Optional[str] = Field(default=None, description="唯一编码")
     display_name: Optional[str] = Field(default=None, description="显示名称")
-    type: Optional[int] = Field(default=None, description="流程类型")
+    type: Optional[str] = Field(default=None, description="流程类型")
     icon: Optional[str] = Field(default=None, description="图标")
     remark: Optional[str] = Field(default=None, description="备注")
 
@@ -112,4 +112,4 @@ class ProcessDesignPageModel(SchemaBase):
     page_size: int = Field(default=10, description="每页记录数")
     name: Optional[str] = Field(default=None, description="唯一编码")
     display_name: Optional[str] = Field(default=None, description="显示名称")
-    type: Optional[int] = Field(default=None, description="流程类型")
+    type: Optional[str] = Field(default=None, description="流程类型")

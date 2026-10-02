@@ -49,7 +49,8 @@ class ModelParser(object):
         # 流程定义基本信息
         processModel.name = lfModel.get("name")
         processModel.displayName = lfModel.get("displayName")
-        processModel.type = lfModel.get("type")
+        raw_type = lfModel.get("type")
+        processModel.type = str(raw_type).strip() if raw_type not in (None, "") else None
         processModel.instanceUrl = lfModel.get("instanceUrl")
         processModel.instanceNoClass = lfModel.get("instanceNoClass")
         processModel.preInterceptors = lfModel.get("preInterceptors")
