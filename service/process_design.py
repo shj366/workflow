@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.common.pagination import paging_data
 from backend.plugin.wf.model.process_design import ProcessDesign
 from backend.plugin.wf.model.process_define import ProcessDefine
+from backend.plugin.wf.schema.process_define import ProcessDefineModel
 from backend.plugin.wf.schema.process_design import (
     ProcessDesignPageModel,
     ProcessDesignCreateModel,
@@ -44,10 +45,26 @@ class ProcessDesignService:
 
         page_data = await paging_data(db, stmt)
         if items := page_data.get('items'):
-            page_data['items'] = [
+            design_rows = [
                 ProcessDesignModel.model_validate(item).model_dump(by_alias=True)
                 for item in items
             ]
+            names = {row['name'] for row in design_rows if row.get('name')}
+            version_map: dict[str, list[dict[str, Any]]] = {}
+            if names:
+                version_result = await db.execute(
+                    select(ProcessDefine)
+                    .where(ProcessDefine.name.in_(names))
+                    .order_by(ProcessDefine.name, desc(ProcessDefine.version))
+                )
+                for define in version_result.scalars().all():
+                    version = ProcessDefineModel.model_validate(define).model_dump(by_alias=True)
+                    version['isVersion'] = True
+                    version_map.setdefault(define.name, []).append(version)
+            for row in design_rows:
+                row['children'] = version_map.get(row.get('name'), [])
+                row['versionCount'] = len(row['children'])
+            page_data['items'] = design_rows
         return page_data
 
     @classmethod
