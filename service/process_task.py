@@ -1,8 +1,11 @@
 from datetime import datetime
-from typing import List, Any
-from sqlalchemy import desc, select
+from typing import Any, List
+
+from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.admin.model import Dept, Role, User
+from backend.app.admin.model.m2m import user_role
 from backend.common.pagination import paging_data
 from backend.plugin.wf.model.process_task import ProcessTask
 from backend.plugin.wf.model.process_instance import ProcessInstance
@@ -225,91 +228,111 @@ class ProcessTaskService:
                 result_items.append(row)
             
             data["items"] = result_items
-
         return data
-
     @classmethod
-    def _get_task_actors(cls, task_model, execution) -> list[str]:
-        """
-        根据Task模型的assignee、candidateUsers、candidateGroups属性以及运行时数据，确定参与者
-        @param task_model Task模型
-        @param execution 运行时数据
-        """
-        # 1. 优先检查运行时是否指定了下一节点处理人
+    async def _get_task_actors(cls, task_model, execution) -> list[str]:
+        """按运行时人员、固定配置及两类通用处理器解析参与人。"""
         args = execution.args or {}
-        next_node_operator = args.get("nextNodeOperator") or args.get("nextOperator")
+        next_node_operator = args.get('nextNodeOperator') or args.get('nextOperator')
         if next_node_operator:
             if isinstance(next_node_operator, list):
-                return next_node_operator
-            elif isinstance(next_node_operator, str):
-                return next_node_operator.split(",")
+                return [str(item) for item in next_node_operator]
+            if isinstance(next_node_operator, str):
+                return [item.strip() for item in next_node_operator.split(',') if item.strip()]
+            return [str(next_node_operator)]
 
-        actor_id_list = []
-        
-        # 2. 检查 assignee
-        assignee = task_model.assignee
+        actor_id_list: list[str] = []
+        assignee = getattr(task_model, 'assignee', None)
         if assignee:
-            assignee_list = assignee.split(",")
-            for assign in assignee_list:
-                assign = assign.strip()
-                # 设计器中的 applicant 表示当前流程发起人。
-                if assign == "applicant":
-                    actor_id_list.append(execution.operator)
-                elif assign.startswith("${") and assign.endswith("}"):
-                    var_name = assign[2:-1]
-                    if var_name in args:
-                        val = args[var_name]
-                        if isinstance(val, list):
-                            actor_id_list.extend(str(item) for item in val)
-                        else:
-                            actor_id_list.append(str(val))
-                elif assign in args:
-                    # 兼容旧逻辑：如果 assignee 是变量名
-                    val = args[assign]
-                    if isinstance(val, list):
-                        actor_id_list.extend(str(item) for item in val)
-                    else:
-                        actor_id_list.append(str(val))
+            for assign in str(assignee).split(','):
+                token = assign.strip()
+                if not token:
+                    continue
+                if token == 'applicant':
+                    actor_id_list.append(str(execution.process_instance.operator))
+                elif token.startswith('${') and token.endswith('}'):
+                    value = args.get(token[2:-1])
+                    actor_id_list.extend(
+                        str(item) for item in value
+                    ) if isinstance(value, list) else actor_id_list.append(str(value)) if value is not None else None
+                elif token in args:
+                    value = args[token]
+                    actor_id_list.extend(str(item) for item in value) if isinstance(value, list) else actor_id_list.append(str(value))
                 else:
-                    actor_id_list.append(assign)
-        
-        # 3. 检查 candidateUsers (候选人)
-        if hasattr(task_model, "candidateUsers") and task_model.candidateUsers:
-            users = task_model.candidateUsers.split(",")
-            for user in users:
-                # 同样支持变量替换
-                if user.startswith("${") and user.endswith("}"):
-                    var_name = user[2:-1]
-                    if var_name in args:
-                        val = args[var_name]
-                        if isinstance(val, list):
-                            actor_id_list.extend(val)
-                        else:
-                            actor_id_list.append(str(val))
-                else:
-                    actor_id_list.append(user)
+                    actor_id_list.append(token)
 
-        # 4. 检查 candidateGroups (候选组/角色)
-        if hasattr(task_model, "candidateGroups") and task_model.candidateGroups:
-            groups = task_model.candidateGroups.split(",")
-            for group in groups:
-                # 同样支持变量替换
-                role_name = group
-                if group.startswith("${") and group.endswith("}"):
-                    var_name = group[2:-1]
-                    if var_name in args:
-                        role_name = str(args[var_name])
-                
-                # 添加角色前缀
-                if role_name:
-                    actor_id_list.append(f"ROLE:{role_name}")
+        assignment_handler = str(getattr(task_model, 'assignmentHandler', '') or '').strip()
+        if not actor_id_list and assignment_handler:
+            actor_id_list = await cls._resolve_assignment_handler(
+                db=execution.engine.db,
+                handler=assignment_handler,
+                execution=execution,
+            )
 
-        # 5. 如果都没有，默认使用当前操作人（兜底）
+        candidate_users = getattr(task_model, 'candidateUsers', None)
+        if candidate_users:
+            actor_id_list.extend(item.strip() for item in str(candidate_users).split(',') if item.strip())
+
+        candidate_groups = getattr(task_model, 'candidateGroups', None)
+        if candidate_groups:
+            actor_id_list.extend(
+                f'ROLE:{item.strip()}'
+                for item in str(candidate_groups).split(',')
+                if item.strip()
+            )
+
         if not actor_id_list:
-            actor_id_list.append(execution.operator)
+            actor_id_list.append(str(execution.operator))
+        return list(dict.fromkeys(actor_id_list))
 
-        # 去重
-        return list(set(actor_id_list))
+    @classmethod
+    async def _resolve_assignment_handler(
+        cls,
+        *,
+        db: AsyncSession,
+        handler: str,
+        execution,
+    ) -> list[str]:
+        if handler == 'dept_leader':
+            operator = str(execution.operator or '')
+            user_filter = (
+                User.id == int(operator)
+                if operator.isdigit()
+                else User.username == operator
+            )
+            user = await db.scalar(select(User).where(user_filter, User.deleted == 0))
+            if user is None or user.dept_id is None:
+                return []
+            dept = await db.scalar(
+                select(Dept).where(Dept.id == user.dept_id, Dept.deleted == 0, Dept.status == 1)
+            )
+            if dept is None or not str(dept.leader or '').strip():
+                return []
+            leader = str(dept.leader).strip()
+            leader_filter = User.id == int(leader) if leader.isdigit() else or_(User.username == leader, User.nickname == leader)
+            leader_user = await db.scalar(select(User).where(leader_filter, User.deleted == 0, User.status == 1))
+            return [leader_user.username] if leader_user else []
+
+        if handler.startswith('role:'):
+            role_name = handler.removeprefix('role:').strip()
+            if not role_name:
+                raise ValueError('角色参与人处理类缺少角色名称')
+            rows = await db.scalars(
+                select(User.username)
+                .join(user_role, user_role.c.user_id == User.id)
+                .join(Role, Role.id == user_role.c.role_id)
+                .where(
+                    Role.name == role_name,
+                    Role.status == 1,
+                    Role.deleted == 0,
+                    User.status == 1,
+                    User.deleted == 0,
+                )
+                .order_by(User.username)
+            )
+            return list(rows)
+
+        raise ValueError(f'不支持的参与人处理类：{handler}')
 
     @classmethod
     async def get_done_list(

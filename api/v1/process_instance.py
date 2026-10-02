@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Request, Depends
 from sqlalchemy import select
 
-from backend.app.admin.model import User
+from backend.app.admin.model import Dept, User
 from backend.common.pagination import DependsPagination, PageData
 from backend.common.response.response_schema import ResponseSchemaModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
@@ -14,17 +14,29 @@ from backend.plugin.wf.service.process_cc_instance import ProcessCCInstanceServi
 
 router = APIRouter()
 
-
 @router.get("/users", summary="获取用户列表选项", dependencies=[DependsJwtAuth])
 async def get_user_options(db: CurrentSession) -> ResponseSchemaModel[list]:
-    """获取用户列表选项（用于选择下一节点处理人）"""
-    stmt = select(User.id, User.username, User.nickname).where(User.status == 1)
+    """获取带部门信息的用户列表，用于委托和加签树形选择。"""
+    stmt = (
+        select(User.id, User.username, User.nickname, User.dept_id, Dept.name, Dept.parent_id)
+        .outerjoin(Dept, Dept.id == User.dept_id)
+        .where(User.status == 1, User.deleted == 0)
+        .order_by(Dept.name, User.nickname, User.username)
+    )
     result = await db.execute(stmt)
-    users = result.all()
-    return response_base.success(data=[
-        {"id": u.id, "username": u.username, "nickname": u.nickname} 
-        for u in users
-    ])
+    return response_base.success(
+        data=[
+            {
+                'id': str(user_id),
+                'username': username,
+                'nickname': nickname,
+                'dept_id': str(dept_id) if dept_id is not None else None,
+                'dept_name': dept_name,
+                'dept_parent_id': str(dept_parent_id) if dept_parent_id is not None else None,
+            }
+            for user_id, username, nickname, dept_id, dept_name, dept_parent_id in result.all()
+        ]
+    )
 
 
 @router.get(

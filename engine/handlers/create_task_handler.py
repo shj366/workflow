@@ -19,23 +19,24 @@ class CreateTaskHandler(IHandler):
         """
         from backend.plugin.wf.service.process_task import ProcessTaskService
 
-        # 确定任务执行人（支持 Assignee 和 Candidate）
-        # 调用 Service 中的通用解析逻辑
-        actors = ProcessTaskService._get_task_actors(self.model, execution)
+        # 确定任务执行人（支持固定参与人、角色处理器和部门领导处理器）
+        actors = await ProcessTaskService._get_task_actors(self.model, execution)
         
         # 确定主要操作人 (operator)
         # 如果解析出了多个参与者，取第一个作为 operator（用于列表显示兼容），其他作为 actor 存储
         # 如果解析出了角色 (ROLE:xxx)，也作为 operator 存入，后续查询会处理
         assignee = actors[0] if actors else execution.operator
             
+        task_type = 1 if self.model.taskType == 'Aidant' else 0
+        perform_type = 1 if self.model.performType == 'ALL' else 0
         # 构建任务对象
         task = ProcessTask(
             process_instance_id=execution.process_instance.id,
             task_name=self.model.name,
             display_name=self.model.displayName,
-            task_type=0,  # 默认主办
-            perform_type=0,  # 默认普通参与
-            task_state=10,  # 进行中
+            task_type=task_type,
+            perform_type=perform_type,
+            task_state=10,
             operator=assignee,
             form_key=self.model.form,
             created_by=execution.process_instance.created_by or 1,  # 继承创建人
