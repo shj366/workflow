@@ -321,11 +321,12 @@ class ProcessDesignService:
         # 按类型分组
         type_map = {}
         for design in designs:
-            type_key = design.type or ""
+            raw_type = design.type
+            type_key = str(raw_type).strip() if raw_type not in (None, "") else ""
             if type_key not in type_map:
                 type_map[type_key] = {
                     "type": type_key,
-                    "title": f"类型{type_key}" if type_key else "默认分类",
+                    "title": type_key or "默认分类",
                     "items": [],
                 }
             # 查询对应的最新启用的流程定义
