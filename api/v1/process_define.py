@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, Request
 from backend.common.pagination import DependsPagination, PageData
 from backend.common.response.response_schema import ResponseSchemaModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
-from backend.database.db import CurrentSession
+from backend.database.db import CurrentSession, CurrentSessionTransaction
 from backend.plugin.wf.schema.process_define import ProcessDefinePageModel, ProcessDefineModel, SaveDesignRequest, UpAndDownRequest
 from backend.plugin.wf.service.process_define import ProcessDefineService
 
@@ -31,7 +31,7 @@ async def get_process_define_detail(
 )
 async def save_process_design(
     request: Request,
-    db: CurrentSession,
+    db: CurrentSessionTransaction,
     data: SaveDesignRequest,
 ) -> ResponseSchemaModel[ProcessDefineModel]:
     """保存流程设计"""
@@ -46,7 +46,7 @@ async def save_process_design(
 )
 async def up_and_down(
     request: Request,
-    db: CurrentSession,
+    db: CurrentSessionTransaction,
     data: UpAndDownRequest,
 ) -> ResponseSchemaModel[int]:
     """启用/禁用流程定义"""
