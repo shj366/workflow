@@ -250,7 +250,7 @@ class ProcessInstanceService:
         from backend.app.admin.model import Role, User
 
         stmt = (
-            select(ProcessTask, ProcessTaskActor.actor_id)
+            select(ProcessTask, ProcessTaskActor.actor_id, ProcessTaskActor.completed)
             .outerjoin(
                 ProcessTaskActor,
                 ProcessTask.id == ProcessTaskActor.process_task_id,
@@ -262,12 +262,14 @@ class ProcessInstanceService:
 
         tasks: dict[int, ProcessTask] = {}
         actor_refs: dict[int, list[str]] = {}
+        actor_completion: dict[int, dict[str, bool]] = {}
         identity_refs: set[str] = set()
-        for task, actor_id in result.all():
+        for task, actor_id, completed in result.all():
             tasks[task.id] = task
             if actor_id:
                 actor_ref = str(actor_id)
                 actor_refs.setdefault(task.id, []).append(actor_ref)
+                actor_completion.setdefault(task.id, {})[actor_ref] = bool(completed)
                 identity_refs.add(actor_ref)
             if task.operator:
                 identity_refs.add(str(task.operator))
@@ -334,28 +336,29 @@ class ProcessInstanceService:
             else:
                 continue
 
-            # 完成任务只展示实际办理人；进行中任务展示全部候选参与人。
+            # 普通任务展示实际办理人；会签任务展示全部参与人及其完成状态。
             refs = (
                 [str(task.operator)]
-                if task.task_state == 20 and task.operator
+                if task.task_state == 20 and task.perform_type != 1 and task.operator
                 else actor_refs.get(task.id) or ([str(task.operator)] if task.operator else [])
             )
             progress = node_progress.setdefault(task.task_name, {"members": []})
             members_by_id = {member["id"]: member for member in progress["members"]}
             for actor_ref in refs:
+                actor_done = task.task_state == 20 or actor_completion.get(task.id, {}).get(actor_ref, False)
                 member = members_by_id.get(actor_ref)
                 if member is None:
                     member = {
                         "id": actor_ref,
                         "name": resolve_actor(actor_ref),
-                        "done": task.task_state == 20,
-                        "active": task.task_state == 10,
+                        "done": actor_done,
+                        "active": task.task_state == 10 and not actor_done,
                     }
                     progress["members"].append(member)
                     members_by_id[actor_ref] = member
                 else:
-                    member["done"] = member["done"] or task.task_state == 20
-                    member["active"] = member["active"] or task.task_state == 10
+                    member["done"] = member["done"] or actor_done
+                    member["active"] = member["active"] or task.task_state == 10 and not actor_done
 
         return {
             "activeNodes": active_nodes,

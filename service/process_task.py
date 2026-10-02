@@ -28,6 +28,24 @@ class ProcessTaskService:
             await cls.add_task_actor(db, task.id, [task.operator])
             
         return task
+    @classmethod
+    async def _get_actor_ids(
+        cls,
+        db: AsyncSession,
+        username: str,
+        user_id: int | None = None,
+    ) -> list[str]:
+        """返回用户可匹配的任务参与人标识。"""
+        actor_ids = [username]
+        if user_id is not None:
+            actor_ids.append(str(user_id))
+        if user_id is not None:
+            from backend.app.admin.service.user_service import UserService
+
+            roles = await UserService.get_roles(db=db, pk=user_id) or []
+            actor_ids.extend(f"ROLE:{role.name}" for role in roles)
+            actor_ids.extend(f"ROLE:{role.id}" for role in roles)
+        return list(dict.fromkeys(actor_ids))
 
     @classmethod
     async def add_task_actor(cls, db: AsyncSession, task_id: int, actor_ids: list[str]):
@@ -58,46 +76,86 @@ class ProcessTaskService:
         return list(result.scalars().all())
 
     @classmethod
-    async def complete(cls, db: AsyncSession, task_id: int, operator: str, args: dict = None, user_id: int = None) -> ProcessTask:
+    async def complete(
+        cls,
+        db: AsyncSession,
+        task_id: int,
+        operator: str,
+        args: dict | None = None,
+        user_id: int | None = None,
+        require_all: bool = False,
+    ) -> ProcessTask:
+        """完成任务；会签任务在所有参与人完成前保持进行中。"""
         import json
+
         from backend.plugin.wf.service.process_cc_instance import ProcessCCInstanceService
-        
-        stmt = select(ProcessTask).where(ProcessTask.id == task_id)
+
+        stmt = select(ProcessTask).where(ProcessTask.id == task_id).with_for_update()
         result = await db.execute(stmt)
         task = result.scalars().first()
         if not task:
             raise ValueError(f"任务[{task_id}]不存在")
-            
-        task.task_state = 20 # 已完成
+
+        actor_ids = await cls._get_actor_ids(db, operator, user_id)
+        actor_stmt = select(ProcessTaskActor).where(
+            ProcessTaskActor.process_task_id == task_id,
+            ProcessTaskActor.actor_id.in_(actor_ids),
+        )
+        actor_result = await db.execute(actor_stmt)
+        actor = actor_result.scalars().first()
+        if not actor:
+            raise ValueError("当前用户不是该任务的参与人")
+        if actor.completed:
+            raise ValueError("当前用户已完成该会签任务")
+        actor.completed = True
+
+        variable: dict[str, Any] = {}
+        if task.variable:
+            try:
+                variable = json.loads(task.variable)
+            except (TypeError, ValueError):
+                variable = {}
+        args = args or {}
+        if args.get("approvalComment"):
+            variable["approvalComment"] = args["approvalComment"]
+        if args.get("submitType"):
+            variable["submitType"] = args["submitType"]
+
+        if task.perform_type == 1 and require_all:
+            approvals = variable.setdefault("countersignApprovals", [])
+            approvals.append(
+                {
+                    "operator": operator,
+                    "approvalComment": args.get("approvalComment"),
+                    "completedAt": datetime.now().isoformat(),
+                }
+            )
+            pending_stmt = select(ProcessTaskActor.id).where(
+                ProcessTaskActor.process_task_id == task_id,
+                ProcessTaskActor.completed.is_(False),
+            ).limit(1)
+            pending_actor = await db.scalar(pending_stmt)
+            if pending_actor is not None:
+                task.variable = json.dumps(variable, ensure_ascii=False)
+                db.add(task)
+                await db.flush()
+                await db.refresh(task)
+                return task
+
+        task.task_state = 20
         task.finish_time = datetime.now()
-        task.operator = operator # 更新实际处理人
-        
-        # 保存审批意见等信息到variable字段
-        if args:
-            variable = {}
-            if task.variable:
-                try:
-                    variable = json.loads(task.variable)
-                except:
-                    pass
-            # 保存审批意见
-            if args.get("approvalComment"):
-                variable["approvalComment"] = args.get("approvalComment")
-            # 保存提交类型
-            if args.get("submitType"):
-                variable["submitType"] = args.get("submitType")
+        task.operator = operator
+        if variable:
             task.variable = json.dumps(variable, ensure_ascii=False)
-            
-            # 处理抄送
-            cc_actors = args.get("ccActors")
-            if cc_actors and len(cc_actors) > 0:
-                await ProcessCCInstanceService.create_cc(
-                    db, 
-                    task.process_instance_id, 
-                    cc_actors, 
-                    user_id or task.created_by
-                )
-        
+
+        if args.get("ccActors"):
+            await ProcessCCInstanceService.create_cc(
+                db,
+                task.process_instance_id,
+                args["ccActors"],
+                user_id or task.created_by,
+            )
+
         db.add(task)
         await db.flush()
         await db.refresh(task)
@@ -129,16 +187,9 @@ class ProcessTaskService:
         """
         import json
         from backend.app.admin.service.user_service import UserService
-
         try:
             user = await UserService.get_userinfo(db=db, username=username)
-            roles = await UserService.get_roles(db=db, pk=user.id)
-            # 设计器保存的是用户 ID，接口认证使用用户名；待办查询必须同时匹配两种身份。
-            actor_ids = [username, str(user.id)]
-            if roles:
-                # 同时支持角色名称和角色ID
-                actor_ids.extend([f"ROLE:{role.name}" for role in roles])
-                actor_ids.extend([f"ROLE:{role.id}" for role in roles])
+            actor_ids = await cls._get_actor_ids(db, username, user.id)
         except Exception:
             # 如果查不到用户，则只查 username
             actor_ids = [username]
@@ -170,15 +221,13 @@ class ProcessTaskService:
             .join(ProcessTaskActor, ProcessTask.id == ProcessTaskActor.process_task_id)
             .where(
                 ProcessTaskActor.actor_id.in_(actor_ids),
-                *filters
+                ProcessTaskActor.completed.is_(False),
+                *filters,
             )
             .distinct()
             .order_by(desc(ProcessTask.created_time))
         )
-
-        # 手动处理结果，支持异步查询角色名
         data = await paging_data(db, stmt)
-        
         items = data.get("items", [])
         if items:
             # 1. 收集需要查询的角色ID

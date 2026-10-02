@@ -103,50 +103,45 @@ class FlowEngine:
         return [task]
         
     async def complete_task(self, task_id: int, operator: str, args: dict = None, user_id: int = None) -> List[ProcessTask]:
-        """
-        完成任务
-        """
-        # 1. 完成任务，传递args以保存审批意见等
-        task = await ProcessTaskService.complete(self.db, task_id, operator, args, user_id)
-        
-        # 2. 获取流程实例
+        """完成任务；会签未完成时只记录当前参与人，不推进流程。"""
+        task = await ProcessTaskService.complete(
+            self.db,
+            task_id,
+            operator,
+            args,
+            user_id,
+            require_all=True,
+        )
+        if task.task_state != 20:
+            return []
+
         stmt = select(ProcessInstance).where(ProcessInstance.id == task.process_instance_id)
         result = await self.db.execute(stmt)
         instance = result.scalars().first()
-        
-        # 3. 获取流程定义
+
         stmt = select(ProcessDefine).where(ProcessDefine.id == instance.process_define_id)
         result = await self.db.execute(stmt)
         process_define = result.scalars().first()
-        
-        # 4. 解析模型
+
         process_model = ModelParser.parse(process_define.content)
-        
-        # 5. 找到节点模型
         node_model = process_model.get_node(task.task_name)
         if not node_model:
             raise ValueError(f"任务节点[{task.task_name}]在流程定义中不存在")
-        
-        # 6. 合并流程变量和当前参数（按 mldong 方式）
-        # 流程变量（包含表单数据如 f_je）存储在 process_instance.variable 中
+
         merged_args = {}
         if instance.variable:
             try:
                 merged_args = json.loads(instance.variable)
-            except:
-                pass
+            except (TypeError, ValueError):
+                merged_args = {}
         merged_args.update(args or {})
-            
-        # 7. 创建执行对象
+
         execution = Execution(self, instance, process_model, operator, merged_args)
-        
-        # 8. 执行流转
         await node_model.run_out_transition(execution)
 
-        # 9. 如果该流程实例已经没有进行中的任务，则标记流程实例为已完成（state=20）
         doing_tasks = await ProcessTaskService.get_doing_task_list(self.db, instance.id)
         if not doing_tasks:
-            instance.state = 20  # 已完成
+            instance.state = 20
             await ProcessInstanceService.update(self.db, instance)
 
         return execution.process_task_list
@@ -157,13 +152,20 @@ class FlowEngine:
         返回 (task, execution, process_model, instance)
         """
         # 1. 完成任务
-        task = await ProcessTaskService.complete(self.db, task_id, operator, args, user_id)
-        
+        task = await ProcessTaskService.complete(
+            self.db,
+            task_id,
+            operator,
+            args,
+            user_id,
+            require_all=False,
+        )
+
         # 2. 获取流程实例
         stmt = select(ProcessInstance).where(ProcessInstance.id == task.process_instance_id)
         result = await self.db.execute(stmt)
         instance = result.scalars().first()
-        
+
         # 3. 获取流程定义
         stmt = select(ProcessDefine).where(ProcessDefine.id == instance.process_define_id)
         result = await self.db.execute(stmt)
