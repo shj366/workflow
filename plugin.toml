@@ -1,7 +1,7 @@
 [plugin]
-summary = '工作流引擎'
-version = '0.1.0'
-description = '移植自mldong的工作流引擎'
+summary = '工作流引擎·企业审批流·钉钉风格'
+version = '1.0.0'
+description = 'jeeflow工作流引擎'
 author = 'Shj366'
 tags = ['other']
 database = ['mysql']
