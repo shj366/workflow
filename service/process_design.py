@@ -303,6 +303,8 @@ class ProcessDesignService:
             .order_by(desc(ProcessDefine.version))
             .limit(1)
         )
+        result = await db.execute(stmt)
+        latest_define = result.scalars().first()
 
         if not latest_define:
             # 如果不存在，则执行普通部署
