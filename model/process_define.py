@@ -1,4 +1,5 @@
-from sqlalchemy import Integer, String, LargeBinary
+import sqlalchemy as sa
+from sqlalchemy import Integer, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from backend.common.model import Base, UserMixin, id_key
@@ -9,7 +10,15 @@ class ProcessDefine(Base, UserMixin):
     流程定义实体
     """
 
-    __tablename__ = "wf_process_define"
+    __table_args__ = (
+        sa.UniqueConstraint(
+            'name',
+            'type',
+            'display_name',
+            'version',
+            name='uq_wf_process_define_identity_version',
+        ),
+    )
     
     id: Mapped[id_key]
     

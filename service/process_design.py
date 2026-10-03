@@ -49,20 +49,30 @@ class ProcessDesignService:
                 ProcessDesignModel.model_validate(item).model_dump(by_alias=True)
                 for item in items
             ]
-            names = {row['name'] for row in design_rows if row.get('name')}
-            version_map: dict[str, list[dict[str, Any]]] = {}
-            if names:
+            identity_keys = {
+                (row.get('name'), row.get('type'), row.get('displayName'))
+                for row in design_rows
+                if row.get('name')
+            }
+            version_map: dict[tuple[str, str | None, str | None], list[dict[str, Any]]] = {}
+            if identity_keys:
                 version_result = await db.execute(
                     select(ProcessDefine)
-                    .where(ProcessDefine.name.in_(names))
+                    .where(
+                        ProcessDefine.name.in_({key[0] for key in identity_keys}),
+                    )
                     .order_by(ProcessDefine.name, desc(ProcessDefine.version))
                 )
                 for define in version_result.scalars().all():
+                    key = (define.name, define.type, define.display_name)
                     version = ProcessDefineModel.model_validate(define).model_dump(by_alias=True)
                     version['isVersion'] = True
-                    version_map.setdefault(define.name, []).append(version)
+                    version_map.setdefault(key, []).append(version)
             for row in design_rows:
-                row['children'] = version_map.get(row.get('name'), [])
+                key = (row.get('name'), row.get('type'), row.get('displayName'))
+                row['children'] = version_map.get(key, [])
+                for version in row['children']:
+                    version['remark'] = row.get('remark')
                 row['versionCount'] = len(row['children'])
             page_data['items'] = design_rows
         return page_data
@@ -223,10 +233,13 @@ class ProcessDesignService:
         except json.JSONDecodeError:
             raise ValueError("流程设计JSON格式错误")
 
-        # 查询是否已有同名流程定义
         stmt = (
             select(ProcessDefine)
-            .where(ProcessDefine.name == design.name)
+            .where(
+                ProcessDefine.name == design.name,
+                ProcessDefine.type == design.type,
+                ProcessDefine.display_name == design.display_name,
+            )
             .order_by(desc(ProcessDefine.version))
             .limit(1)
         )
@@ -282,12 +295,14 @@ class ProcessDesignService:
         # 查找最新版本的流程定义
         stmt = (
             select(ProcessDefine)
-            .where(ProcessDefine.name == design.name)
+            .where(
+                ProcessDefine.name == design.name,
+                ProcessDefine.type == design.type,
+                ProcessDefine.display_name == design.display_name,
+            )
             .order_by(desc(ProcessDefine.version))
             .limit(1)
         )
-        result = await db.execute(stmt)
-        latest_define = result.scalars().first()
 
         if not latest_define:
             # 如果不存在，则执行普通部署
