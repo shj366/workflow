@@ -13,7 +13,7 @@ from backend.plugin.wf.model.process_instance import ProcessInstance
 from backend.plugin.wf.model.process_task import ProcessTask
 from backend.plugin.wf.service.process_instance import ProcessInstanceService
 from backend.plugin.wf.service.process_task import ProcessTaskService
-
+from backend.utils.timezone import timezone
 
 class FlowEngine:
     db: AsyncSession
@@ -43,7 +43,7 @@ class FlowEngine:
         #   - 用户相关信息（u_realName 等，需在调用处提前写入 args）
         #   - 自动生成标题 autoGenTitle
         real_name = args.get("u_realName") or args.get("realName") or operator
-        now = datetime.now()
+        now = timezone.now()
         auto_title = f"{real_name}的{process_define.display_name}-{now.strftime('%Y-%m-%d %H:%M')}"
         args.setdefault("autoGenTitle", auto_title)
 
