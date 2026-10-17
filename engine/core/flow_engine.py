@@ -44,7 +44,7 @@ class FlowEngine:
         #   - 自动生成标题 autoGenTitle
         real_name = args.get("u_realName") or args.get("realName") or operator
         now = timezone.now()
-        auto_title = f"{real_name}的{process_define.display_name}-{now.strftime('%Y-%m-%d %H:%M')}"
+        auto_title = f"{real_name}的{process_define.display_name}-{now.strftime('%Y-%m-%d %H:%M:%S')}"
         args.setdefault("autoGenTitle", auto_title)
 
         # 4. 创建实例

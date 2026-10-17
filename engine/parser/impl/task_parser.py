@@ -10,6 +10,14 @@ class TaskParser(AbstractNodeParser):
 
     def parse_node(self, lfNode):
         properties = lfNode.get(NodeParser.PROPERTIES_KEY, {})
+        field = properties.get(NodeParser.EXT_FIELD_KEY)
+        if not isinstance(field, dict):
+            field = {}
+
+        def property_value(key):
+            value = properties.get(key)
+            return value if value else field.get(key)
+
         self.nodeModel.form = properties.get(NodeParser.FORM_KEY)
         self.nodeModel.assignee = properties.get(NodeParser.ASSIGNEE_KEY)
         self.nodeModel.taskType = properties.get(NodeParser.TASK_TYPE_KEY)
@@ -20,8 +28,8 @@ class TaskParser(AbstractNodeParser):
         self.nodeModel.autoExecute = properties.get(NodeParser.AUTH_EXECUTE_KEY)
         self.nodeModel.callback = properties.get(NodeParser.CALLBACK_KEY)
         self.nodeModel.assignmentHandler = properties.get(NodeParser.ASSIGNMENT_HANDLE_KEY)
-        self.nodeModel.candidateUsers = properties.get(NodeParser.CANDIDATE_USERS_KEY)
-        self.nodeModel.candidateGroups = properties.get(NodeParser.CANDIDATE_GROUPS_KEY)
+        self.nodeModel.candidateUsers = property_value(NodeParser.CANDIDATE_USERS_KEY)
+        self.nodeModel.candidateGroups = property_value(NodeParser.CANDIDATE_GROUPS_KEY)
         self.nodeModel.candidateHandler = properties.get(NodeParser.CANDIDATE_HANDLER_KEY)
 
     def new_nodel(self):

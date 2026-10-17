@@ -53,6 +53,7 @@ class DecisionModel(NodeModel):
                 await transition.execute(execution)
                 
         if not is_found:
-            # 找不到下一个可执行路线
-            logging.error(f'{self.name} 找不到下一个可执行路线')
-            # raise Exception(f'{self.name} 找不到下一个可执行路线')
+            # 决策节点没有可执行路线时必须失败，不能静默完成并留下未推进的流程实例。
+            message = f'{self.name} 找不到下一个可执行路线'
+            logging.error(message)
+            raise ValueError(message)
