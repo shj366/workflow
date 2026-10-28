@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy import select
 
 from backend.common.pagination import DependsPagination, PageData
 from backend.common.response.response_schema import ResponseSchemaModel, response_base
 from backend.common.security.jwt import DependsJwtAuth
 from backend.database.db import CurrentSession, CurrentSessionTransaction
 from backend.plugin.wf.engine.core.flow_engine import FlowEngine
+from backend.plugin.wf.model.process_task import ProcessTask
 from backend.plugin.wf.schema.process_task import (
-    ProcessTaskPageModel,
-    CompleteTaskRequest,
-    ProcessTaskModel,
     AddCandidateRequest,
+    CompleteTaskRequest,
     JumpTaskRequest,
+    ProcessTaskModel,
+    ProcessTaskPageModel,
     SurrogateRequest,
 )
 from backend.plugin.wf.service.process_task import ProcessTaskService
@@ -81,7 +83,9 @@ async def complete_task(
     user_id = request.user.id
     args = data.args or {}
     submit_type = args.get("submitType", "agree")
-    
+    task = await db.scalar(select(ProcessTask).where(ProcessTask.id == data.task_id))
+    process_instance_id = task.process_instance_id if task else None
+
     # 根据提交类型分流
     if submit_type == "rollback":
         # 退回上一步
@@ -115,7 +119,17 @@ async def complete_task(
             args=args,
             user_id=user_id
         )
-    
+
+    if process_instance_id is not None:
+        from backend.plugin.codis.service.opportunity_registration import sync_workflow_completion
+
+        await sync_workflow_completion(
+            db,
+            process_instance_id=process_instance_id,
+            submit_type=submit_type,
+            comment=args.get('approvalComment'),
+        )
+
     return response_base.success(data=tasks)
 
 
@@ -146,6 +160,11 @@ async def add_candidate(
 ) -> ResponseSchemaModel[bool]:
     """加签：为任务增加参与人"""
     result = await ProcessTaskService.add_candidate_actor(db, data.process_task_id, data.actor_ids, request.user.id)
+    if result:
+        from backend.plugin.codis.service.opportunity_registration import enqueue_workflow_task_notice
+
+        for actor_id in data.actor_ids:
+            await enqueue_workflow_task_notice(db, task_id=data.process_task_id, actor_id=actor_id)
     return response_base.success(data=result)
 
 
@@ -192,4 +211,8 @@ async def surrogate_task(
 ) -> ResponseSchemaModel[bool]:
     """委托：将任务委托给其他人处理"""
     result = await ProcessTaskService.surrogate(db, data.process_task_id, data.user_id)
+    if result:
+        from backend.plugin.codis.service.opportunity_registration import enqueue_workflow_task_notice
+
+        await enqueue_workflow_task_notice(db, task_id=data.process_task_id, actor_id=data.user_id)
     return response_base.success(data=result)
