@@ -100,8 +100,11 @@ async def delete_designs(
     ids: list[int],
 ) -> ResponseSchemaModel[dict]:
     """删除流程设计"""
-    await ProcessDesignService.delete_designs(db, ids)
-    return response_base.success(data={})
+    try:
+        await ProcessDesignService.delete_designs(db, ids)
+        return response_base.success(data={})
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
 
 @router.post(

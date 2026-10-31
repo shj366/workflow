@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.common.pagination import paging_data
 from backend.plugin.wf.model.process_design import ProcessDesign
 from backend.plugin.wf.model.process_define import ProcessDefine
-from backend.plugin.wf.schema.process_define import ProcessDefineModel
 from backend.plugin.wf.schema.process_design import (
     ProcessDesignPageModel,
     ProcessDesignCreateModel,
@@ -38,42 +37,41 @@ class ProcessDesignService:
             filters.append(ProcessDesign.type == query_object.type)
 
         stmt = (
-            select(ProcessDesign)
-            .where(*filters)
+            select(
+                ProcessDesign.id.label('id'),
+                ProcessDesign.name.label('name'),
+                ProcessDesign.display_name.label('display_name'),
+                ProcessDesign.type.label('type'),
+                ProcessDesign.icon.label('icon'),
+                ProcessDesign.is_deployed.label('is_deployed'),
+                ProcessDesign.remark.label('remark'),
+                ProcessDesign.create_time.label('create_time'),
+                ProcessDesign.update_time.label('update_time'),
+                ProcessDesign.create_user.label('create_user'),
+                ProcessDesign.update_user.label('update_user'),
+            )
+            .where(ProcessDesign.is_deleted == 0, *filters)
             .order_by(desc(ProcessDesign.update_time))
         )
 
         page_data = await paging_data(db, stmt)
         if items := page_data.get('items'):
             design_rows = [
-                ProcessDesignModel.model_validate(item).model_dump(by_alias=True)
+                {
+                    'id': item[0],
+                    'name': item[1],
+                    'displayName': item[2],
+                    'type': item[3],
+                    'icon': item[4],
+                    'isDeployed': item[5],
+                    'remark': item[6],
+                    'createTime': item[7],
+                    'updateTime': item[8],
+                    'createUser': item[9],
+                    'updateUser': item[10],
+                }
                 for item in items
             ]
-            identity_keys = {
-                (row.get('name'), row.get('type'), row.get('displayName'))
-                for row in design_rows
-                if row.get('name')
-            }
-            version_map: dict[tuple[str, str | None, str | None], list[dict[str, Any]]] = {}
-            if identity_keys:
-                version_result = await db.execute(
-                    select(ProcessDefine)
-                    .where(
-                        ProcessDefine.name.in_({key[0] for key in identity_keys}),
-                    )
-                    .order_by(ProcessDefine.name, desc(ProcessDefine.version))
-                )
-                for define in version_result.scalars().all():
-                    key = (define.name, define.type, define.display_name)
-                    version = ProcessDefineModel.model_validate(define).model_dump(by_alias=True)
-                    version['isVersion'] = True
-                    version_map.setdefault(key, []).append(version)
-            for row in design_rows:
-                key = (row.get('name'), row.get('type'), row.get('displayName'))
-                row['children'] = version_map.get(key, [])
-                for version in row['children']:
-                    version['remark'] = row.get('remark')
-                row['versionCount'] = len(row['children'])
             page_data['items'] = design_rows
         return page_data
 
@@ -201,9 +199,17 @@ class ProcessDesignService:
     @classmethod
     async def delete_designs(cls, db: AsyncSession, ids: list[int]) -> bool:
         """删除流程设计（软删除）"""
-        await db.execute(
-            update(ProcessDesign).where(ProcessDesign.id.in_(ids)).values(is_deleted=1)
+        unique_ids = set(ids)
+        if not unique_ids:
+            raise ValueError("请至少选择一条流程设计")
+
+        result = await db.execute(
+            update(ProcessDesign)
+            .where(ProcessDesign.id.in_(unique_ids), ProcessDesign.is_deleted == 0)
+            .values(is_deleted=1)
         )
+        if result.rowcount != len(unique_ids):
+            raise ValueError("部分流程设计不存在或已删除，请刷新列表后重试")
         await db.flush()
         return True
 

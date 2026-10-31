@@ -71,6 +71,11 @@ class FlowEngine:
 
         await start_node.execute(execution)
 
+        doing_tasks = await ProcessTaskService.get_doing_task_list(self.db, instance.id)
+        if not doing_tasks:
+            instance.state = 20
+            await ProcessInstanceService.update(self.db, instance)
+
         return instance
 
     async def start_and_execute(self, process_define_id: int, operator: str, args: dict = None) -> ProcessInstance:
