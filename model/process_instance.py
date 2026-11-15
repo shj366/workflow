@@ -11,6 +11,7 @@ class ProcessInstance(Base, UserMixin):
     """
 
     __tablename__ = "wf_process_instance"
+    __table_args__ = {'comment': '流程实例表'}
     
     id: Mapped[id_key] = mapped_column(init=False)
     

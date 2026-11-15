@@ -10,6 +10,7 @@ class ProcessCCInstance(Base, UserMixin):
     """
 
     __tablename__ = "wf_process_cc_instance"
+    __table_args__ = {'comment': '流程实例抄送表'}
     
     id: Mapped[id_key] = mapped_column(init=False)
     

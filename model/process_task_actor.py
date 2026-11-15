@@ -10,6 +10,7 @@ class ProcessTaskActor(DataClassBase):
     """
 
     __tablename__ = "wf_process_task_actor"
+    __table_args__ = {'comment': '流程任务参与人关系表'}
 
     id: Mapped[id_key] = mapped_column(init=False)
 

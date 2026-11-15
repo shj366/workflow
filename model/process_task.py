@@ -11,6 +11,7 @@ class ProcessTask(Base, UserMixin):
     """
 
     __tablename__ = "wf_process_task"
+    __table_args__ = {'comment': '流程任务表'}
     
     id: Mapped[id_key] = mapped_column(init=False)
     
